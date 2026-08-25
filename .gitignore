@@ -1,0 +1,6 @@
+# The containerised build test keeps its tree in a Docker volume, but a native
+# run leaves these behind.
+/build/
+/downloads/
+/sstate-cache/
+/tmp*/
