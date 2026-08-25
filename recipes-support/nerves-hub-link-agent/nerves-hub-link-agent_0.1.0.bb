@@ -13,10 +13,16 @@ SRC_URI = "git://github.com/nerves-hub/nerves-hub-link-agent.git;protocol=https;
            file://agent.toml \
            "
 
-# Pinned to a commit because there is no release tag yet. Replace with the tag
-# and set PV to match when there is one.
-SRCREV = "2e8c6e21e7f3416430bac3591fba8e85422d07cb"
-PV = "0.1.0+git"
+# v0.1.0, as a sha.
+#
+# Not `tag=v${PV}` in SRC_URI: the fetcher treats that as a revision too and
+# refuses both at once -- "Conflicting revisions ... found, please specify one
+# valid value". The sha is what gets fetched; the tag is what the version in
+# the filename means.
+#
+# Bumping is a new recipe file at the new version rather than an edit to this
+# one, so a stale pin shows up in a filename instead of hiding in a variable.
+SRCREV = "5b3babb55b8020bc7bb1e1ebf638d73f82fc93e8"
 
 S = "${WORKDIR}/git"
 
@@ -37,17 +43,38 @@ inherit cargo_bin cargo-update-recipe-crates systemd useradd
 # whenever Cargo.lock changes.
 require ${BPN}-crates.inc
 
-# RAUC on a Yocto image. The crate's default feature set includes fwup and the
-# sandbox, and a device should carry only the tool it has -- the features exist
-# so an image that will never see a fwup archive does not contain the code to
-# apply one.
-CARGO_BUILD_FLAGS += "--no-default-features --features rauc"
+# Which cargo features to build, as PACKAGECONFIG.
+#
+# The crate's default set includes fwup and the sandbox, and a device should
+# carry only the tool it has: the features exist so an image that will never
+# see a fwup archive does not contain the code to apply one. So the default
+# here is the one update tool and nothing else.
+#
+# There is no feature for the local shell. It is always built, and whether a
+# device serves one is decided by the agent's configuration and by NervesHub --
+# a device worth opening a shell on is usually one you can no longer reach, so
+# putting it behind a rebuild would be putting it behind the problem.
+#
+# The same goes for health, geo, logging and network_identity: all
+# configuration, no features.
+PACKAGECONFIG ??= "rauc"
+
+# The fourth field is RDEPENDS: an update tool the agent shells out to has to
+# be on the device.
+PACKAGECONFIG[rauc] = ",,,rauc"
+PACKAGECONFIG[fwup] = ",,,fwup"
+PACKAGECONFIG[sandbox] = ""
+
+# PACKAGECONFIG names are cargo feature names, so the list maps straight across.
+CARGO_BUILD_FLAGS += "--no-default-features --features ${@','.join(sorted((d.getVar('PACKAGECONFIG') or '').split()))}"
 
 # `rauc install` is a D-Bus client; the work happens in `rauc service`. Without
 # it the agent gets "Error creating proxy: Could not connect", which reads like
 # a broken bundle rather than a missing daemon. The agent probes for the
 # service at startup so that lands while someone is looking at it.
-RDEPENDS:${PN} += "rauc"
+#
+# The dependency itself comes from PACKAGECONFIG[rauc] above, so an image built
+# for fwup does not drag RAUC in.
 
 SYSTEMD_SERVICE:${PN} = "nerves-hub-link-agent.service"
 SYSTEMD_AUTO_ENABLE:${PN} = "enable"
