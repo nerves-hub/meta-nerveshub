@@ -15,6 +15,16 @@ Environment=RUST_LOG=nerves_hub_link_agent=info
 # socket, owned by this user and recreated each boot.
 User=agent
 Group=agent
+
+# The logging extension shells out to `journalctl --follow`, which reads
+# nothing without this group -- and reports it as a tail that "ended", which
+# looks like an empty journal rather than a permission it does not have.
+#
+# Granted here rather than in the user database. GROUPMEMS_PARAM runs against
+# the recipe's own sysroot, which knows only the groups the recipe creates, so
+# it cannot see a group systemd owns: "group 'systemd-journal' does not exist".
+# systemd resolves this at start, when it certainly does.
+SupplementaryGroups=systemd-journal
 RuntimeDirectory=nerves-hub-link-agent
 StateDirectory=nerves-hub-link-agent
 

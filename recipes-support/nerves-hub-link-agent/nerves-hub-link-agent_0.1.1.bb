@@ -94,11 +94,6 @@ GROUPADD_PARAM:${PN} = "--system agent"
 USERADD_PARAM:${PN} = "--system --no-create-home --home-dir ${localstatedir}/lib/nerves-hub-link-agent \
                        --shell /sbin/nologin --gid agent agent"
 
-# Reading the journal needs the group, and the logging extension shells out to
-# `journalctl --follow`. Without it the extension attaches, reports nothing, and
-# says so only as a tail that "ended" immediately -- which looks like an empty
-# journal rather than a permission it does not have.
-GROUPMEMS_PARAM:${PN} = "-a agent -g systemd-journal"
 
 do_install:append() {
     install -d ${D}${sysconfdir}
