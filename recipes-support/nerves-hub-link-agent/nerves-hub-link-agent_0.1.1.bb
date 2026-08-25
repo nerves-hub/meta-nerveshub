@@ -13,7 +13,7 @@ SRC_URI = "git://github.com/nerves-hub/nerves-hub-link-agent.git;protocol=https;
            file://agent.toml \
            "
 
-# v0.1.0, as a sha.
+# v0.1.1, as a sha.
 #
 # Not `tag=v${PV}` in SRC_URI: the fetcher treats that as a revision too and
 # refuses both at once -- "Conflicting revisions ... found, please specify one
@@ -22,7 +22,7 @@ SRC_URI = "git://github.com/nerves-hub/nerves-hub-link-agent.git;protocol=https;
 #
 # Bumping is a new recipe file at the new version rather than an edit to this
 # one, so a stale pin shows up in a filename instead of hiding in a variable.
-SRCREV = "5b3babb55b8020bc7bb1e1ebf638d73f82fc93e8"
+SRCREV = "062f94955096b36211164acf0d38c68bc6e17610"
 
 S = "${WORKDIR}/git"
 
@@ -84,7 +84,21 @@ SYSTEMD_AUTO_ENABLE:${PN} = "enable"
 # docs/deploying.md in the source tree.
 USERADD_PACKAGES = "${PN}"
 GROUPADD_PARAM:${PN} = "--system agent"
-USERADD_PARAM:${PN} = "--system --no-create-home --shell /sbin/nologin --gid agent agent"
+# The home directory is the state directory, and it is not created here.
+#
+# The systemd unit's StateDirectory= makes /var/lib/nerves-hub-link-agent at
+# start, owned by this user, so it exists by the time anything needs it. What
+# matters is that $HOME names a directory that will be there: a passwd entry
+# pointing at a home that was never created is the kind of thing nothing
+# notices until something falls back to $HOME and fails against it.
+USERADD_PARAM:${PN} = "--system --no-create-home --home-dir ${localstatedir}/lib/nerves-hub-link-agent \
+                       --shell /sbin/nologin --gid agent agent"
+
+# Reading the journal needs the group, and the logging extension shells out to
+# `journalctl --follow`. Without it the extension attaches, reports nothing, and
+# says so only as a tail that "ended" immediately -- which looks like an empty
+# journal rather than a permission it does not have.
+GROUPMEMS_PARAM:${PN} = "-a agent -g systemd-journal"
 
 do_install:append() {
     install -d ${D}${sysconfdir}
