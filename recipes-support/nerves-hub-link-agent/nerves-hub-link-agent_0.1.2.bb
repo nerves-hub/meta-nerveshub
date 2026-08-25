@@ -22,7 +22,7 @@ SRC_URI = "git://github.com/nerves-hub/nerves-hub-link-agent.git;protocol=https;
 #
 # Bumping is a new recipe file at the new version rather than an edit to this
 # one, so a stale pin shows up in a filename instead of hiding in a variable.
-SRCREV = "062f94955096b36211164acf0d38c68bc6e17610"
+SRCREV = "a17ff231c52b78ced9e63dd1a66fc43c8da86545"
 
 S = "${WORKDIR}/git"
 
