@@ -13,7 +13,7 @@ SRC_URI = "git://github.com/nerves-hub/nerves-hub-link-agent.git;protocol=https;
            file://agent.toml \
            "
 
-# v0.1.3, as a sha.
+# v0.1.4, as a sha.
 #
 # Not `tag=v${PV}` in SRC_URI: the fetcher treats that as a revision too and
 # refuses both at once -- "Conflicting revisions ... found, please specify one
@@ -22,7 +22,7 @@ SRC_URI = "git://github.com/nerves-hub/nerves-hub-link-agent.git;protocol=https;
 #
 # Bumping is a new recipe file at the new version rather than an edit to this
 # one, so a stale pin shows up in a filename instead of hiding in a variable.
-SRCREV = "9cdc139bfee25be358505ac395d1e5f63e337a60"
+SRCREV = "722503885f8e0d41956e949ca4b75351b4d7153c"
 
 S = "${WORKDIR}/git"
 
