@@ -65,6 +65,31 @@ PACKAGECONFIG[rauc] = ",,,rauc"
 PACKAGECONFIG[fwup] = ",,,fwup"
 PACKAGECONFIG[sandbox] = ""
 
+# Say which layer is missing, rather than which package.
+#
+# The update tools come from layers this one does not depend on, because
+# depending on all of them would force every image to carry the two it does not
+# use. The cost is that a missing layer surfaces as "Nothing RPROVIDES 'rauc'"
+# at build time, which names the package and leaves the reader to work out
+# which layer provides it. This says it directly, at parse time.
+python () {
+    selected = set((d.getVar("PACKAGECONFIG") or "").split())
+    collections = set((d.getVar("BBFILE_COLLECTIONS") or "").split())
+
+    # PACKAGECONFIG name -> (layer collection, repository)
+    providers = {
+        "rauc": ("rauc", "https://github.com/rauc/meta-rauc"),
+        "fwup": ("fwup-layer", "https://github.com/fwup-home/meta-fwup"),
+    }
+
+    for tool, (collection, url) in providers.items():
+        if tool in selected and collection not in collections:
+            bb.fatal(
+                "PACKAGECONFIG selects '%s', but no layer providing it is in this "
+                "configuration. Add %s, or drop '%s' from PACKAGECONFIG." % (tool, url, tool)
+            )
+}
+
 # PACKAGECONFIG names are cargo feature names, so the list maps straight across.
 CARGO_BUILD_FLAGS += "--no-default-features --features ${@','.join(sorted((d.getVar('PACKAGECONFIG') or '').split()))}"
 
