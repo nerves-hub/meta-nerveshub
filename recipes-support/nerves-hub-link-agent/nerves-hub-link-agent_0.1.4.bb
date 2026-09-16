@@ -1,7 +1,7 @@
 SUMMARY = "NervesHub device agent"
 DESCRIPTION = "Connects a Linux device to NervesHub over Phoenix Channels, reports \
 the running firmware, asks the application on the device whether an update may be \
-installed, and applies it through RAUC."
+installed, and applies it through RAUC or fwup."
 HOMEPAGE = "https://github.com/nerves-hub/nerves-hub-link-agent"
 BUGTRACKER = "https://github.com/nerves-hub/nerves-hub-link-agent/issues"
 
@@ -24,19 +24,7 @@ SRC_URI = "git://github.com/nerves-hub/nerves-hub-link-agent.git;protocol=https;
 # one, so a stale pin shows up in a filename instead of hiding in a variable.
 SRCREV = "722503885f8e0d41956e949ca4b75351b4d7153c"
 
-S = "${WORKDIR}/git"
-
-# Where `file://` entries in SRC_URI land. Newer releases unpack them into
-# UNPACKDIR; on scarthgap it is undefined, and referring to it there silently
-# resolves to nothing -- `install: cannot stat '/agent.toml'`. A weak default
-# keeps one path working on both.
-UNPACKDIR ??= "${WORKDIR}"
-
-# `cargo_bin`, from meta-rust-bin, rather than poky's `cargo`. The toolchain
-# comes from that layer because no released Yocto ships a Rust new enough --
-# see the layer README. The class was called `cargo` in older meta-rust-bin and
-# collided with poky's; `cargo_bin` is the current name.
-inherit cargo_bin cargo-update-recipe-crates systemd useradd
+inherit cargo cargo-update-recipe-crates systemd useradd
 
 # Yocto fetches offline, so cargo cannot resolve dependencies during
 # do_compile. Regenerate with `bitbake -c update_crates nerves-hub-link-agent`
@@ -57,38 +45,12 @@ require ${BPN}-crates.inc
 #
 # The same goes for health, geo, logging and network_identity: all
 # configuration, no features.
-PACKAGECONFIG ??= "rauc"
+PACKAGECONFIG ??= "${@bb.utils.contains("BBFILE_COLLECTIONS", "rauc", 'rauc', "", d)} \
+                   ${@bb.utils.contains("BBFILE_COLLECTIONS", "fwup-layer", 'fwup', "", d)}"
 
-# The fourth field is RDEPENDS: an update tool the agent shells out to has to
-# be on the device.
-PACKAGECONFIG[rauc] = ",,,rauc"
-PACKAGECONFIG[fwup] = ",,,fwup"
+PACKAGECONFIG[rauc] = ",,,rauc,,fwup"
+PACKAGECONFIG[fwup] = ",,,fwup,,rauc"
 PACKAGECONFIG[sandbox] = ""
-
-# Say which layer is missing, rather than which package.
-#
-# The update tools come from layers this one does not depend on, because
-# depending on all of them would force every image to carry the two it does not
-# use. The cost is that a missing layer surfaces as "Nothing RPROVIDES 'rauc'"
-# at build time, which names the package and leaves the reader to work out
-# which layer provides it. This says it directly, at parse time.
-python () {
-    selected = set((d.getVar("PACKAGECONFIG") or "").split())
-    collections = set((d.getVar("BBFILE_COLLECTIONS") or "").split())
-
-    # PACKAGECONFIG name -> (layer collection, repository)
-    providers = {
-        "rauc": ("rauc", "https://github.com/rauc/meta-rauc"),
-        "fwup": ("fwup-layer", "https://github.com/fwup-home/meta-fwup"),
-    }
-
-    for tool, (collection, url) in providers.items():
-        if tool in selected and collection not in collections:
-            bb.fatal(
-                "PACKAGECONFIG selects '%s', but no layer providing it is in this "
-                "configuration. Add %s, or drop '%s' from PACKAGECONFIG." % (tool, url, tool)
-            )
-}
 
 # PACKAGECONFIG names are cargo feature names, so the list maps straight across.
 CARGO_BUILD_FLAGS += "--no-default-features --features ${@','.join(sorted((d.getVar('PACKAGECONFIG') or '').split()))}"
