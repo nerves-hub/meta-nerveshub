@@ -10,7 +10,8 @@ LIC_FILES_CHKSUM = "file://LICENSE;md5=86d3f3a95c324c9479bd8986968f4327"
 
 SRC_URI = "git://github.com/nerves-hub/nerves-hub-link-agent.git;protocol=https;branch=main \
            file://nerves-hub-link-agent.service \
-           file://agent.toml \
+           file://agent.toml.rauc \
+            file://agent.toml.fwup \
            "
 
 # v0.1.4, as a sha.
@@ -81,10 +82,39 @@ GROUPADD_PARAM:${PN} = "--system agent"
 USERADD_PARAM:${PN} = "--system --no-create-home --home-dir ${localstatedir}/lib/nerves-hub-link-agent \
                        --shell /sbin/nologin --gid agent agent"
 
+NERVES_HUB_LINK_AGENT_PRODUCT_KEY ?= "change me"
+NERVES_HUB_LINK_AGENT_PRODUCT_SECRET ?= "change me"
+NERVES_HUB_HOST ?= "devices.nervescloud.com"
+NERVES_HUB_PORT ?= "443"
+
+python __anonymous() {
+    if not d.getVar('NERVES_HUB_LINK_AGENT_PRODUCT_KEY'):
+        bb.fatal("Required variable NERVES_HUB_LINK_AGENT_PRODUCT_KEY is not defined. \
+                  Set NERVES_HUB_LINK_AGENT_PRODUCT_KEY in local.conf or use bbappend.")
+    if not d.getVar('NERVES_HUB_LINK_AGENT_PRODUCT_SECRET'):
+        bb.fatal("Required variable NERVES_HUB_LINK_AGENT_PRODUCT_SECRET is not defined. \
+                  Set NERVES_HUB_LINK_AGENT_PRODUCT_SECRET in local.conf or use bbappend.")
+
+    if d.getVar('NERVES_HUB_LINK_AGENT_PRODUCT_KEY') == "change me":
+        bb.warn("Required variable NERVES_HUB_LINK_AGENT_PRODUCT_KEY is defined with default value")
+    if d.getVar('NERVES_HUB_LINK_AGENT_PRODUCT_SECRET') == "change me":
+        bb.warn("Required variable NERVES_HUB_LINK_AGENT_PRODUCT_SECRET is defined with default value")
+}
+
 
 do_install:append() {
     install -d ${D}${sysconfdir}
-    install -m 0644 ${UNPACKDIR}/agent.toml ${D}${sysconfdir}/nerves-hub-link-agent.toml
+
+    if ${@bb.utils.contains('PACKAGECONFIG', 'fwup', 'true', 'false', d)}; then
+        install -m 0644 ${UNPACKDIR}/agent.toml.fwup ${D}${sysconfdir}/nerves-hub-link-agent.toml
+    elif ${@bb.utils.contains('PACKAGECONFIG', 'rauc', 'true', 'false', d)}; then
+        install -m 0644 ${UNPACKDIR}/agent.toml.rauc ${D}${sysconfdir}/nerves-hub-link-agent.toml
+    fi
+
+    sed -i -e 's,@NERVES_HUB_LINK_AGENT_PRODUCT_KEY@,${NERVES_HUB_LINK_AGENT_PRODUCT_KEY},g' ${D}${sysconfdir}/nerves-hub-link-agent.toml
+    sed -i -e 's,@NERVES_HUB_LINK_AGENT_PRODUCT_SECRET@,${NERVES_HUB_LINK_AGENT_PRODUCT_SECRET},g' ${D}${sysconfdir}/nerves-hub-link-agent.toml
+    sed -i -e 's,@NERVES_HUB_HOST@,${NERVES_HUB_HOST},g' ${D}${sysconfdir}/nerves-hub-link-agent.toml
+    sed -i -e 's,@NERVES_HUB_PORT@,${NERVES_HUB_PORT},g' ${D}${sysconfdir}/nerves-hub-link-agent.toml
 
     # Guarded, because `systemd_system_unitdir` is empty on a distro without
     # systemd and the install then quietly puts the unit nowhere: the package
